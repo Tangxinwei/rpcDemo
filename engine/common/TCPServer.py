@@ -1,95 +1,80 @@
 # -*- coding: utf-8 -*-
-import libevent
 import socket
 import Connection
 import sys
-import IdManager
+import select
 
 class TCPServer(object):
-	def __init__(self, ip, port, maxClient = 0):
+	def __init__(self, ip, port):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		sock.bind((ip, port))
 		sock.setblocking(0)
-		sock.listen(maxClient)
-		base = libevent.Base()
-		event = libevent.Event(base, sock.fileno(), libevent.EV_READ | libevent.EV_PERSIST, self.onAccept, None)
-		event.add(-1)
+		sock.bind((ip, port))
+		sock.listen(0)
 		self.sock = sock
-		self.event = event
-		self.base = base
 		self.allConnections = {}
-		self.allTimer = {}
-		self.timerIdGen = IdManager.RecycleIntIdManager()
 
-	def onTimerTimeOut(self, _, timerId):
-		try:
-			timer, func, args = self.allTimer[timerId]
-			del self.allTimer[timerId]
-			self.timerIdGen.recycle(timerId)
-			func(*args)
-		except:
-			sys.excepthook(*sys.exc_info())
-
-	def delayExec(self, delayTime, func, *args):
-		timerId = self.timerIdGen.genid()
-		timer = libevent.Timer(self.base, self.onTimerTimeOut, timerId)
-		timer.add(delayTime)
-		self.allTimer[timerId] = (timer, func, args)
-
-	def delayExecRepeat(self, delayTime, func, *args):
-		def onTimeOut():
-			if func(*args):
-				self.delayExec(delayTime, onTimeOut)
-		self.delayExec(delayTime, onTimeOut)
+		self.inputs = [self.sock]
+		self.outputs = []
 
 	def run(self):
-		self.base.dispatch()
+		while True:
+			self.tick()
 
-	def deleteConnection(self, fileno):
-		if fileno in self.allConnections:
-			connection, event = self.allConnections[fileno]
-			del self.allConnections[fileno]
-			connection.close()
-			event.delete()
+	def tick(self, timeout = 0.001):
+		readable, writeable, exceptonal = select.select(self.inputs, self.outputs, self.inputs, timeout)
+		if not (readable or writeable or exceptonal):
+			return
 
-	def onAccept(self, event, fileno, eventNumber, userData):
-		clientSock, _ = self.sock.accept()
-		clientSock.setblocking(0)
-		connection = Connection.Connection(clientSock)
-		clientEvent = libevent.Event(self.base, clientSock.fileno(), libevent.EV_READ | libevent.EV_TIMEOUT | libevent.EV_PERSIST,\
-			self.onClientDataReceive, connection)
-		clientEvent.add(-1)
-		self.allConnections[clientSock.fileno()] = (connection, clientEvent)
-	
-
-	def onClientDataReceive(self, event, fileno, eventNumber, connection):
-		if eventNumber == libevent.EV_TIMEOUT:
-			self.deleteConnection(fileno)
-		else:
-			data = ''
-			while True:
-				ndata = ''
-				try:
-					ndata = connection.sock.recv(4096)
-				except:
-					pass
-				if not ndata:
-					break
-				data += ndata
-			if not data:
-				self.deleteConnection(fileno)
+		for s in readable:
+			if s is self.sock:
+				sock, _ = self.sock.accept()
+				sock.setblocking(0)
+				self.inputs.append(sock)
+				connection = Connection.Connection(sock, self)
+				connection.isInInput = True
+				connection.isInOutput = False
+				self.allConnections[sock] = connection
 			else:
-				connection.onReceiveData(data)
-				connection.send(data)
+				connection = self.allConnections[s]
+				if connection.receiveData():
+					is not connection.isInOutput:
+						connection.isInOutput = True
+						self.outputs.append(s)
+				else:
+					if connection.isInInput:
+						connection.isInInput = False
+						self.inputs.remove(s)
+					if connection.isInOutput:
+						connection.isInOutput = False
+						self.outputs.remove(s)
+					del self.allConnections[s]
+					connection.close()
+
+		for s in writeable:
+			connection = self.allConnections.get(s)
+			if connection:
+				connection.onSendData()
+
+		for s in exceptonal:
+			connection = self.allConnections.get(s)
+			if not connection:
+				continue
+			if connection.isInInput:
+				connection.isInInput = False
+				self.inputs.remove(s)
+			if connection.isInOutput:
+				connection.isInOutput = False
+				self.outputs.remove(s)
+			
+			del self.allConnections[s]
+			connection.close()
+
+	def onReceiveData(self, connection, data):
+		pass
 
 if __name__ == '__main__':
-	import time
-	def fun():
-		print 'exec', time.time()
-		return True
-	server = TCPServer('0.0.0.0', 14002)
-	server.delayExecRepeat(0.01, fun)
-	print time.time()
+	server = TCPServer('0.0.0.0', 8080)
+
 	server.run()
 
