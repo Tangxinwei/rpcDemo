@@ -1,0 +1,12 @@
+package test;
+
+message Person{
+	required string name 	= 1;
+	required int32 	no		= 2;
+	repeated Person p = 3;
+}
+
+service CallPerson{
+	rpc testCall(Person) returns (Person);
+}
+
