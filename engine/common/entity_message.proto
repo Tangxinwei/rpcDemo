@@ -1,0 +1,4 @@
+message EntityMessage{
+	required string methodName = 1;
+	required string paramDict 	= 2;
+}

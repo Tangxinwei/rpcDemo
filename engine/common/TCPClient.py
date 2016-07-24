@@ -3,6 +3,7 @@ import socket
 import Connection
 import sys
 import select
+import RPCHandler
 
 class TCPClient(object):
 	def __init__(self):
@@ -15,7 +16,7 @@ class TCPClient(object):
 	def connect(self, ip, port):
 		try:
 			self.sock.connect((ip, port))
-			self.connection = Connection.Connection(self.sock, self)
+			self.connection = Connection.Connection(self.sock, self, RPCHandler.ClientHandler())
 			return True
 		except:
 			import sys
@@ -23,12 +24,15 @@ class TCPClient(object):
 			self.sock = None
 			return False
 
-	def tick(self):
+	def tick(self, timeout = 0.01):
 		if not self.connection:
 			return
 		inputs = [self.sock]
 		outputs = [self.sock]
-		readable, writeable, exceptonal = select.select(inputs, outputs, inputs, 0.01)
+		try:
+			readable, writeable, exceptonal = select.select(inputs, outputs, inputs, timeout)
+		except:
+			return
 		if not (readable or writeable or exceptonal):
 			return True
 
@@ -45,19 +49,22 @@ class TCPClient(object):
 			return False
 		return True
 
-	def onReceiveData(self, connection, data):
-		pass
-
 	def close(self):
 		if self.connection:
 			self.connection.close()
 			self.connection = None
 
+	def callMethod(self, methodName, paramDict):
+		self.connection.rpcHandler.callMethod(methodName, paramDict)
+
 if __name__ == '__main__':
+	import sys
+	sys.path.append('../../3rdpart')
 	client = TCPClient()
 	if client.connect('127.0.0.1', 8080):
 		print 'connect success'
 	else:
 		print 'connect failed'
+	client.callMethod('echoTest', {'s' : 'hello'})
 	while client.tick():
 		pass

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import socket
 import Connection
+import RPCHandler
 import sys
 import select
 
@@ -22,7 +23,10 @@ class TCPServer(object):
 			self.tick()
 
 	def tick(self, timeout = 0.001):
-		readable, writeable, exceptonal = select.select(self.inputs, self.outputs, self.inputs, timeout)
+		try:
+			readable, writeable, exceptonal = select.select(self.inputs, self.outputs, self.inputs, timeout)
+		except:
+			return
 		if not (readable or writeable or exceptonal):
 			return
 
@@ -31,14 +35,14 @@ class TCPServer(object):
 				sock, _ = self.sock.accept()
 				sock.setblocking(0)
 				self.inputs.append(sock)
-				connection = Connection.Connection(sock, self)
+				connection = Connection.Connection(sock, self, RPCHandler.ServerHandler())
 				connection.isInInput = True
 				connection.isInOutput = False
 				self.allConnections[sock] = connection
 			else:
 				connection = self.allConnections[s]
 				if connection.receiveData():
-					is not connection.isInOutput:
+					if not connection.isInOutput:
 						connection.isInOutput = True
 						self.outputs.append(s)
 				else:
@@ -70,10 +74,9 @@ class TCPServer(object):
 			del self.allConnections[s]
 			connection.close()
 
-	def onReceiveData(self, connection, data):
-		pass
-
 if __name__ == '__main__':
+	import sys
+	sys.path.append('../../3rdpart')
 	server = TCPServer('0.0.0.0', 8080)
 
 	server.run()
