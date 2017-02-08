@@ -2,25 +2,31 @@
 import struct
 
 class Connection(object):
-	def __init__(self, sock, owner, rpcHandler):
+	def __init__(self, sock, owner = None):
 		self.sock = sock
 		self.data = ''
 		self.validDataLen = -1
 		self.curDataLen = 0
-		self.owner = owner
 		self.realSendData = ''
+		self.rpcHandler = None
+		self.owner = owner
+
+	def setRpcHandler(self, rpcHandler):
 		self.rpcHandler = rpcHandler
 		rpcHandler.setConnection(self)
 
 	def receiveData(self):
-		data = self.sock.recv(1024)
+		try:
+			data = self.sock.recv(1024)
+		except:
+			return False
 		if not data:
 			return False
 		self.onReceiveData(data)
 		return True
 
 	def onReceiveData(self, data):
-		if not self.owner:
+		if not self.sock:
 			return
 		
 		self.data += data
@@ -49,19 +55,26 @@ class Connection(object):
 		self.realSendData += struct.pack('<I', len(data)) + data
 
 	def onSendData(self):
-		if self.sock:
+		try:
 			sendLen = self.sock.send(self.realSendData)
 			self.realSendData = self.realSendData[sendLen:]
-		
+		except:
+			return False
+		return True
 
 	def close(self):
 		if not self.sock:
 			return
 		try:
 			self.sock.close()
-			self.owner = None
 		except:
 			pass
 		finally:
-			self.rpcHandler.setConnection(None)
+			if self.owner:
+				self.owner.removeConnection(self)
+				
+			if self.rpcHandler:
+				self.rpcHandler.setConnection(None)
+				self.rpcHandler = None
 			self.sock = None
+			self.owner = None

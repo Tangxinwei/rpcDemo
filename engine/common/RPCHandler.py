@@ -45,4 +45,4 @@ class ClientHandler(RPCHandler):
 	@rpc_decorator(Str('s'), )
 	def echoTest(self, echoStr):
 		print 'receive echo:', echoStr
-		self.close()
+		#self.close()
