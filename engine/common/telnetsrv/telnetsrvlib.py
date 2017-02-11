@@ -981,9 +981,10 @@ class TelnetHandlerBase(SocketServer.BaseRequestHandler):
             return
         if self.DOECHO:
             self.writeline(self.WELCOME)
+            self.write(self.PROMPT)
         self.session_start()
         while self.RUNSHELL:
-            raw_input = self.readline(prompt=self.PROMPT).strip()
+            raw_input = self.readline().strip()
             if self.handler_input_line(raw_input):
                 continue
             self.input = self.input_reader(self, raw_input)
