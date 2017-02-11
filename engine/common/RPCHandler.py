@@ -26,6 +26,9 @@ class RPCHandler(object):
 		message.paramDict = jsonStr
 		self.connection.send(message.SerializeToString())
 
+	def send(self, data):
+		self.connection.send(data)
+
 	def onReceiveData(self, data):
 		from entity_message_pb2 import EntityMessage
 		message = EntityMessage()
@@ -34,6 +37,9 @@ class RPCHandler(object):
 		if func:
 			paramDict = json.loads(message.paramDict)
 			func(self, paramDict)
+
+	def onReceiveRawData(self, data):
+		pass
 
 class ServerHandler(RPCHandler):
 	@rpc_decorator(Str('s'), )

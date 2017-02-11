@@ -10,9 +10,11 @@ class Connection(object):
 		self.realSendData = ''
 		self.rpcHandler = None
 		self.owner = owner
+		self.isRawSteam = False
 
-	def setRpcHandler(self, rpcHandler):
+	def setRpcHandler(self, rpcHandler, isRawSteam = False):
 		self.rpcHandler = rpcHandler
+		self.isRawSteam = isRawSteam
 		rpcHandler.setConnection(self)
 
 	def receiveData(self):
@@ -28,7 +30,12 @@ class Connection(object):
 	def onReceiveData(self, data):
 		if not self.sock:
 			return
-		
+
+		if self.isRawSteam:
+			if self.rpcHandler:
+				self.rpcHandler.onReceiveRawData(data)
+			return
+
 		self.data += data
 		self.curDataLen += len(data)
 		data = self.onCheckData()
@@ -52,7 +59,10 @@ class Connection(object):
 		return None
 
 	def send(self, data):
-		self.realSendData += struct.pack('<I', len(data)) + data
+		if self.isRawSteam:
+			self.realSendData += data
+		else:
+			self.realSendData += struct.pack('<I', len(data)) + data
 
 	def onSendData(self):
 		try:
