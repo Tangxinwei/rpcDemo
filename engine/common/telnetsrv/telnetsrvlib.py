@@ -989,7 +989,7 @@ class TelnetHandlerBase(SocketServer.BaseRequestHandler):
             self.write(self.PROMPT)
         self.session_start()
         while self.RUNSHELL:
-            raw_input = self.readline().strip('\n\r ')
+            raw_input = self.readline().strip('\n\r')
             if self.handler_input_line(raw_input):
                 continue
             self.input = self.input_reader(self, raw_input)
