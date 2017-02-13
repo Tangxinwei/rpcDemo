@@ -503,11 +503,16 @@ class TelnetHandlerBase(SocketServer.BaseRequestHandler):
             str = curses.tigetstr(curses.has_key._capability_names[k])
             if str:
                 self.ESCSEQ[str] = k
+        #maybe in windows, use a hardcode seq
+        if self.ESCSEQ.get('\x1b[D') is None:
+            self.ESCSEQ = {'\x08' : 263, '\x1b[D' : 260, '\x1b[A' : 259, '\x1b[C' : 261, '\x1b[B' : 258}
         self.CODES['DEOL'] = curses.tigetstr('el')
         self.CODES['DEL'] = curses.tigetstr('dch1')
         self.CODES['INS'] = curses.tigetstr('ich1')
         self.CODES['CSRLEFT'] = curses.tigetstr('cub1')
         self.CODES['CSRRIGHT'] = curses.tigetstr('cuf1')
+        if self.CODES.get('CSRLEFT') is None:
+            self.CODES = {'CSRLEFT' : '\x1b[D', 'DEL' : '\x1b[P', 'CSRRIGHT' : '\x1b[C', 'DEOL' : '\x1b[K', 'INS' : None}
 
     def setup(self):
         "Connect incoming connection to a telnet session"
@@ -714,7 +719,7 @@ class TelnetHandlerBase(SocketServer.BaseRequestHandler):
                     self._readline_echo(BELL, echo)
                 continue
             else:
-                if ord(c) < 32:
+                if ord(c) < 32 and c != '\t':
                     c = curses.ascii.unctrl(c)
                 if len(line) > insptr:
                     self._readline_insert(c, echo, insptr, line)
@@ -984,7 +989,7 @@ class TelnetHandlerBase(SocketServer.BaseRequestHandler):
             self.write(self.PROMPT)
         self.session_start()
         while self.RUNSHELL:
-            raw_input = self.readline().strip()
+            raw_input = self.readline().strip('\n\r ')
             if self.handler_input_line(raw_input):
                 continue
             self.input = self.input_reader(self, raw_input)
