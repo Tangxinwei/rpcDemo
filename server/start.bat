@@ -1,0 +1,2 @@
+python MyGameServer.py
+pause

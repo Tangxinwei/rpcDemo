@@ -40,15 +40,18 @@ class SelectTickModelClient(object):
 			self.connection = None
 
 class SelectTickModel(object):
-	def __init__(self, sock, handler_accept = None):
+	def __init__(self, sock, handler_accept = None, hanlder_close = None):
 		self.sock = sock
 		self.handler_accept = handler_accept
+		self.hanlder_close = hanlder_close
 		self.allConnections = {}
 
 		self.inputs = set([self.sock])
 		self.outputs = set()
 
 	def removeConnection(self, connection):
+		if self.hanlder_close:
+			self.hanlder_close(connection)
 		sock = connection.sock
 		self.inputs.discard(sock)
 		self.outputs.discard(sock)
